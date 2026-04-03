@@ -1,20 +1,17 @@
-from fastapi import FastAPI, HTTPException, status, Depends
+from fastapi import FastAPI, HTTPException, status, Depends, Security
+from fastapi.security import APIKeyHeader
+from fastapi.responses import HTMLResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from contextlib import asynccontextmanager
+from sqlalchemy.future import select
+from sqlalchemy.orm import selectinload
 
 from app.schemas import RouteRequest, RouteResponse, WaypointTimeline, WeatherData
 from app.services import build_itinerary
 from app.config import settings
 from app.database import engine, Base, get_db
 from app.models import DBRoute, DBWaypoint
-
-from sqlalchemy.future import select
-from sqlalchemy.orm import selectinload
-from app.schemas import WeatherData
-
-from fastapi import Security, HTTPException, status
-from fastapi.security import APIKeyHeader
-from app.config import settings
+from app.routers import route_planner
 
 # Define the header name we expect
 api_key_header = APIKeyHeader(name="X-API-KEY", auto_error=False)
@@ -36,10 +33,79 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title=settings.api_title, version=settings.api_version, lifespan=lifespan)
 
-@app.get("/")
+@app.get("/", response_class=HTMLResponse, include_in_schema=False)
 async def root():
-    return {"status": "online", "service": settings.api_title, "docs": "/docs"}
-
+    html_content = """
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Route Aggregator API</title>
+        <style>
+            body { 
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+                background-color: #0f172a; 
+                color: #f8fafc; 
+                display: flex; 
+                justify-content: center; 
+                align-items: center; 
+                height: 100vh; 
+                margin: 0; 
+            }
+            .container { 
+                text-align: center; 
+                background: #1e293b; 
+                padding: 3rem; 
+                border-radius: 12px; 
+                box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3); 
+                border: 1px solid #334155; 
+                max-width: 400px;
+            }
+            h1 { margin-top: 0; margin-bottom: 0.5rem; color: #38bdf8; font-size: 1.5rem; }
+            p { color: #94a3b8; margin-bottom: 2rem; font-size: 0.95rem; line-height: 1.5; }
+            .btn { 
+                background-color: #0ea5e9; 
+                color: white; 
+                padding: 12px 24px; 
+                text-decoration: none; 
+                border-radius: 6px; 
+                font-weight: 600; 
+                transition: background-color 0.2s; 
+                display: inline-block;
+            }
+            .btn:hover { background-color: #0284c7; }
+            .status { 
+                display: inline-flex; 
+                align-items: center; 
+                gap: 8px; 
+                font-size: 0.85rem; 
+                color: #10b981; 
+                margin-bottom: 1.5rem; 
+                font-weight: 600;
+                letter-spacing: 0.5px;
+                text-transform: uppercase;
+            }
+            .dot { 
+                width: 8px; 
+                height: 8px; 
+                background-color: #10b981; 
+                border-radius: 50%; 
+                box-shadow: 0 0 8px #10b981; 
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="status"><div class="dot"></div> System Online</div>
+            <h1>Logistics & Route Aggregator</h1>
+            <p>Core routing engine and weather aggregation service running securely in the cloud.</p>
+            <a href="/docs" class="btn">Explore API Documentation</a>
+        </div>
+    </body>
+    </html>
+    """
+    return HTMLResponse(content=html_content, status_code=200)
 @app.post("/api/v1/routes/plan", response_model=RouteResponse, dependencies=[Depends(get_api_key)])
 async def plan_route(request: RouteRequest, db: AsyncSession = Depends(get_db)):
     if not settings.owm_api_key:
