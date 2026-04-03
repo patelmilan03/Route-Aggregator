@@ -6,20 +6,16 @@ from app.schemas import RouteRequest, WaypointTimeline, WeatherData, WaypointInp
 from app.config import settings
 
 async def fetch_weather_for_location(client: httpx.AsyncClient, waypoint: WaypointInput) -> Dict[str, Any]:
-    """
-    Fetches weather data using precise GPS coordinates.
-    """
     params = {
         "lat": waypoint.lat,
         "lon": waypoint.lon,
         "appid": settings.owm_api_key,
-        "units": "metric" # Force Celsius
+        "units": "metric"
     }
     try:
         response = await client.get(settings.owm_base_url, params=params, timeout=10.0)
         response.raise_for_status()
         data = response.json()
-        
         return {
             "success": True,
             "data": WeatherData(
@@ -29,37 +25,79 @@ async def fetch_weather_for_location(client: httpx.AsyncClient, waypoint: Waypoi
                 sunset_utc=data["sys"]["sunset"]
             )
         }
-    except httpx.HTTPStatusError as e:
-        return {"success": False, "error": f"API Error: {e.response.status_code}"}
-    except httpx.RequestError as e:
-        return {"success": False, "error": f"Network error occurred: {str(e)}"}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+async def fetch_travel_time(client: httpx.AsyncClient, origin: WaypointInput, destination: WaypointInput) -> int:
+    """
+    Queries OSRM to get the exact driving time between two coordinates.
+    Returns the duration in minutes.
+    """
+    # OSRM API expects coordinates in longitude,latitude format
+    url = f"http://router.project-osrm.org/route/v1/driving/{origin.lon},{origin.lat};{destination.lon},{destination.lat}?overview=false"
+    try:
+        response = await client.get(url, timeout=5.0)
+        response.raise_for_status()
+        data = response.json()
+        
+        if data.get("code") == "Ok" and data.get("routes"):
+            duration_seconds = data["routes"][0]["duration"]
+            return int(duration_seconds / 60)
+            
+    except Exception:
+        pass # If the API fails or rate limits, we silently catch it and return the fallback below
+        
+    return 45 # Fallback buffer if the routing engine fails
 
 async def build_itinerary(request: RouteRequest) -> List[WaypointTimeline]:
-    """
-    Orchestrates the concurrent fetching of weather data and calculates timeline.
-    """
     async with httpx.AsyncClient() as client:
-        # Pass the full waypoint object instead of just the string
-        tasks = [fetch_weather_for_location(client, wp) for wp in request.waypoints]
-        weather_results = await asyncio.gather(*tasks)
+        # 1. Fetch Weather (Concurrent)
+        weather_tasks = [fetch_weather_for_location(client, wp) for wp in request.waypoints]
+        
+        # 2. Fetch Travel Times between point A -> B, B -> C (Concurrent)
+        travel_tasks = []
+        for i in range(len(request.waypoints) - 1):
+            travel_tasks.append(
+                fetch_travel_time(client, request.waypoints[i], request.waypoints[i+1])
+            )
+        
+        # Await all external requests simultaneously
+        weather_results = await asyncio.gather(*weather_tasks)
+        travel_times = await asyncio.gather(*travel_tasks)
 
     timeline = []
     current_time = request.start_time
-    travel_buffer_mins = 45 
 
     for index, (waypoint, weather_res) in enumerate(zip(request.waypoints, weather_results)):
         arrival = current_time
         departure = arrival + timedelta(minutes=waypoint.estimated_duration_mins)
         
+        after_sunset = False
+        weather_data = None
+        
+        if weather_res["success"]:
+            weather_data = weather_res["data"]
+            
+            # New logic: Extracts ONLY the clock time (HH:MM:SS) and compares them
+            arrival_time_only = arrival.time()
+            sunset_time_only = weather_data.sunset_utc.time()
+            
+            if arrival_time_only >= sunset_time_only:
+                after_sunset = True
+
         node = WaypointTimeline(
             sequence_order=index + 1,
-            location=waypoint.name, # Use the new 'name' field
+            location=waypoint.name,
             arrival_time=arrival,
             departure_time=departure,
-            weather=weather_res["data"] if weather_res["success"] else None,
+            is_after_sunset=after_sunset,
+            weather=weather_data,
             error=weather_res.get("error")
         )
         timeline.append(node)
-        current_time = departure + timedelta(minutes=travel_buffer_mins)
+        
+        # Add the dynamic travel time to reach the NEXT waypoint (if one exists)
+        if index < len(travel_times):
+            current_time = departure + timedelta(minutes=travel_times[index])
 
     return timeline

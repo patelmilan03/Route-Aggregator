@@ -12,6 +12,21 @@ from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 from app.schemas import WeatherData
 
+from fastapi import Security, HTTPException, status
+from fastapi.security import APIKeyHeader
+from app.config import settings
+
+# Define the header name we expect
+api_key_header = APIKeyHeader(name="X-API-KEY", auto_error=False)
+
+async def get_api_key(api_key_header: str = Security(api_key_header)):
+    if api_key_header == settings.api_key:
+        return api_key_header
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Could not validate API Key",
+    )
+
 # Create tables on startup. In production, use Alembic for migrations instead.
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -25,11 +40,7 @@ app = FastAPI(title=settings.api_title, version=settings.api_version, lifespan=l
 async def root():
     return {"status": "online", "service": settings.api_title, "docs": "/docs"}
 
-@app.post(
-    "/api/v1/routes/plan", 
-    response_model=RouteResponse, 
-    status_code=status.HTTP_200_OK
-)
+@app.post("/api/v1/routes/plan", response_model=RouteResponse, dependencies=[Depends(get_api_key)])
 async def plan_route(request: RouteRequest, db: AsyncSession = Depends(get_db)):
     if not settings.owm_api_key:
         raise HTTPException(status_code=500, detail="API key not configured.")
@@ -130,3 +141,4 @@ async def get_route(route_id: int, db: AsyncSession = Depends(get_db)):
         total_waypoints=len(timeline),
         timeline=timeline
     )
+

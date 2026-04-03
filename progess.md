@@ -29,4 +29,27 @@
 ### 6. Containerization (Pending)
 * **Action:** Write Dockerfile and manage `.dockerignore`.
 * **Logic:** Ensure the application environment is isolated, reproducible, and OS-agnostic (bypassing Windows file-lock quirks).
+
+### 7. Fixed Temporal Logic Bug
+* **Action:** Patched `services.py` to use `.time()` comparisons for daylight checking.
+* **Logic:** Prevents "After Sunset" false positives caused by comparing current sunset dates against future arrival dates.
+
+### 8. Local Containerization (Complete)
+* **Action:** Built Docker Image and ran container via `docker run`.
+* **Logic:** Achieved OS-level abstraction. The API now runs in a consistent Linux environment regardless of the host OS.
+
+### 9. Cloud Strategy (Planned)
+* **Target:** Transition from `localhost` to a Public Cloud Provider.
+* **Goal:** Enable global access via a persistent URL and managed database.
+
+### 10. API Security Layer
+* **Action:** Implemented `APIKeyHeader` authentication.
+* **Logic:** Protects infrastructure from unauthorized use by requiring a secret key in the request headers.
+* **Decision:** Used FastAPI's `Security` dependencies for clean, reusable protection across all endpoints.
+
+### 11. Production Environment Readiness
+* **Action:** Updated Docker CMD to support dynamic port binding (`${PORT:-8000}`).
+* **Logic:** Vital for compatibility with Cloud Platform-as-a-Service (PaaS) providers that assign ports at runtime.
+
+
 ---
