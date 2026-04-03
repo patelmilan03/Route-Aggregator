@@ -11,7 +11,7 @@ from app.services import build_itinerary
 from app.config import settings
 from app.database import engine, Base, get_db
 from app.models import DBRoute, DBWaypoint
-from app.routers import route_planner
+# from app.routers import route_planner
 
 # Define the header name we expect
 api_key_header = APIKeyHeader(name="X-API-KEY", auto_error=False)
@@ -106,6 +106,7 @@ async def root():
     </html>
     """
     return HTMLResponse(content=html_content, status_code=200)
+
 @app.post("/api/v1/routes/plan", response_model=RouteResponse, dependencies=[Depends(get_api_key)])
 async def plan_route(request: RouteRequest, db: AsyncSession = Depends(get_db)):
     if not settings.owm_api_key:
