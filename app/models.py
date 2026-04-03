@@ -26,6 +26,9 @@ class DBWaypoint(Base):
     # Weather & Logic Flags
     temperature_celsius = Column(Float, nullable=True)
     conditions = Column(String, nullable=True)
+    # Add these right below conditions
+    sunrise_utc = Column(DateTime, nullable=True)
+    sunset_utc = Column(DateTime, nullable=True)
     is_after_sunset = Column(Boolean, default=False)
     error_message = Column(String, nullable=True)
 

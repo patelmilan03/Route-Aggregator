@@ -24,10 +24,12 @@ class WaypointTimeline(BaseModel):
     location: str
     arrival_time: datetime
     departure_time: datetime
+    is_after_sunset: bool = False  # NEW FIELD
     weather: Optional[WeatherData] = None
     error: Optional[str] = None
 
 class RouteResponse(BaseModel):
+    id: int  # NEW FIELD (Database ID)
     activity_name: str
     total_waypoints: int
     timeline: List[WaypointTimeline]
