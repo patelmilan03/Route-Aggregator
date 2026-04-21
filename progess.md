@@ -56,4 +56,13 @@
 * **Action:** Connected the GitHub repository to Render for automated Docker-based Continuous Deployment.
 * **Logic:** Pushing code to the `main` branch now automatically triggers a cloud build, pulling the latest code and spinning up a new container with zero downtime.
 * **Decision:** Transitioned from local hosting to a managed cloud environment, securely injecting environment variables via the provider's dashboard.
----
+
+### 13. System Monitoring & Keep-Alive Daemon
+* **Action:** Implemented a native `asyncio` background task triggered via FastAPI's `@app.on_event("startup")`.
+* **Logic:** Automates a self-ping to the public URL every 10 minutes using `httpx`.
+* **Decision:** Solves Render's free-tier 15-minute inactivity sleep cycle entirely within the Python backend, removing reliance on external cron jobs.
+
+### 14. UI/UX Dashboard Integration
+* **Action:** Replaced the default JSON root response with a styled `HTMLResponse`.
+* **Logic:** Displays the project mission, origin story (Spiti Valley use-case), and system status.
+* **Decision:** Significantly improves Developer Experience (DX) and portfolio presentation for non-technical stakeholders and recruiters without cluttering the core API.

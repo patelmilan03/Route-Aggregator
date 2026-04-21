@@ -1,6 +1,6 @@
 # Logistics & Route Aggregator API 🌍⏱️
 
-A high-performance, asynchronous REST API built with FastAPI that acts as a central logistics engine. It ingests a sequence of geographical waypoints, calculates dynamic driving times between them, and concurrently aggregates localized weather and daylight data to generate a precision travel itinerary.
+A high-performance, asynchronous REST API built with FastAPI that acts as a central logistics engine. Born out of the necessity to safely schedule a multi-day Spiti Valley driving circuit, this API ingests a sequence of geographical waypoints, calculates dynamic driving times between them, and concurrently aggregates localized weather and daylight data to generate a precision travel itinerary.
 
 ## 🚀 Features
 
@@ -9,6 +9,7 @@ A high-performance, asynchronous REST API built with FastAPI that acts as a cent
 * **Temporal Daylight Engine:** Compares calculated arrival times against localized UTC sunset data to automatically flag nighttime safety/visibility conflicts.
 * **Eager-Loaded Persistence:** Utilizes SQLAlchemy and `aiosqlite` to persist routes and waypoints, employing eager loading to prevent lazy-load crashes in asynchronous environments.
 * **Header Authentication:** Secures infrastructure against unauthorized consumption via `X-API-KEY` header validation.
+* **Automated Keep-Alive Daemon:** Native `asyncio` background loop that pings the server to prevent PaaS cold starts and downtime.
 * **Containerized & CI/CD Ready:** Fully Dockerized for OS-agnostic deployment, currently running on Render via an automated GitHub pipeline.
 
 ## 🛠️ Tech Stack
@@ -88,5 +89,6 @@ All endpoints require the `X-API-KEY` header.
 **GET** `/api/v1/routes/{id}`
 Returns the fully generated timeline with calculated arrival times, dynamic driving gaps, and weather flags.
 
-## 📜 Interactive Documentation
-Once the server is running, navigate to `http://localhost:8000/docs` (or your live Render URL + `/docs`) to interact with the auto-generated Swagger UI.
+## 📜 UI & Documentation
+* **Landing Dashboard:** Navigate to the root URL `/` to view the styled HTML status dashboard and project origin.
+* **Interactive Docs:** Navigate to `/docs` to interact with the auto-generated Swagger UI.
