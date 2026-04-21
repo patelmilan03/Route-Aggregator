@@ -5,7 +5,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from contextlib import asynccontextmanager
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
-
+import asyncio
+import httpx
 from app.schemas import RouteRequest, RouteResponse, WaypointTimeline, WeatherData
 from app.services import build_itinerary
 from app.config import settings
@@ -33,6 +34,26 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title=settings.api_title, version=settings.api_version, lifespan=lifespan)
 
+# --- KEEP-ALIVE DAEMON ---
+async def keep_alive():
+    # Replace this with your exact Render URL
+    url = "https://route-aggregator-api.onrender.com" 
+    
+    async with httpx.AsyncClient() as client:
+        while True:
+            await asyncio.sleep(10 * 60)  # Pauses the loop for 10 minutes
+            try:
+                await client.get(url)
+                print("Keep-alive ping successful.")
+            except Exception as e:
+                print(f"Keep-alive ping failed: {e}")
+
+@app.on_event("startup")
+async def startup_event():
+    # Spawns the daemon in the background without blocking the main API
+    asyncio.create_task(keep_alive())
+# -------------------------
+
 @app.get("/", response_class=HTMLResponse, include_in_schema=False)
 async def root():
     html_content = """
@@ -50,20 +71,21 @@ async def root():
                 display: flex; 
                 justify-content: center; 
                 align-items: center; 
-                height: 100vh; 
+                min-height: 100vh; 
                 margin: 0; 
+                padding: 2rem;
             }
             .container { 
-                text-align: center; 
                 background: #1e293b; 
                 padding: 3rem; 
                 border-radius: 12px; 
                 box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3); 
                 border: 1px solid #334155; 
-                max-width: 400px;
+                max-width: 600px;
             }
-            h1 { margin-top: 0; margin-bottom: 0.5rem; color: #38bdf8; font-size: 1.5rem; }
-            p { color: #94a3b8; margin-bottom: 2rem; font-size: 0.95rem; line-height: 1.5; }
+            h1 { margin-top: 0; color: #38bdf8; font-size: 1.8rem; text-align: center; }
+            h2 { color: #e2e8f0; font-size: 1.2rem; margin-top: 2rem; border-bottom: 1px solid #334155; padding-bottom: 0.5rem; }
+            p { color: #94a3b8; font-size: 0.95rem; line-height: 1.6; }
             .btn { 
                 background-color: #0ea5e9; 
                 color: white; 
@@ -72,11 +94,14 @@ async def root():
                 border-radius: 6px; 
                 font-weight: 600; 
                 transition: background-color 0.2s; 
-                display: inline-block;
+                display: block;
+                text-align: center;
+                margin-top: 2.5rem;
             }
             .btn:hover { background-color: #0284c7; }
             .status { 
-                display: inline-flex; 
+                display: flex; 
+                justify-content: center;
                 align-items: center; 
                 gap: 8px; 
                 font-size: 0.85rem; 
@@ -97,9 +122,18 @@ async def root():
     </head>
     <body>
         <div class="container">
-            <div class="status"><div class="dot"></div> System Online</div>
+            <div class="status"><div class="dot"></div> System Online & Monitoring</div>
             <h1>Logistics & Route Aggregator</h1>
-            <p>Core routing engine and weather aggregation service running securely in the cloud.</p>
+            
+            <h2>The Mission</h2>
+            <p>An automated logistics engine designed to ingest a sequence of geographical waypoints, calculate dynamic driving times between them using OSRM, and concurrently aggregate localized weather and daylight data to generate a precision travel itinerary.</p>
+            
+            <h2>The Problem</h2>
+            <p>Standard travel planning tools rely on static time buffers and fail to account for real-world driving distances or localized daylight constraints. Furthermore, sequentially querying multiple third-party services (routing, weather) creates massive latency bottlenecks in backend systems.</p>
+
+            <h2>The Origin</h2>
+            <p>This architecture was born out of necessity while mapping out a complex Spiti Valley circuit. Attempting to manually schedule a logical, multi-day route from Rishikesh to Manali exposed a critical flaw: standard maps couldn't accurately forecast localized mountain driving times combined with strict pre-sunset arrival constraints. This API automates that exact safety and logistical calculation.</p>
+            
             <a href="/docs" class="btn">Explore API Documentation</a>
         </div>
     </body>
